@@ -1,0 +1,275 @@
+/* 1920×1080 固定画布。抖音那边的教训照搬：不用 CSS 滤镜（每次换图都要重新光栅化，和解码器抢 GPU）；
+ * 要整块移动的内容常驻一个合成层（will-change: transform）；焦点放大不做过渡。 */
+html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #0b0d10; color: #e8eaed;
+             font-family: "Samsung One", "Noto Sans CJK SC", sans-serif; }
+.hide { display: none !important; }
+
+/* ---------- 主页 ---------- */
+#home { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+/* 左边的来源栏：浏览视频时收起来，按左键滑出来盖在网格上（用户 2026-10-01） */
+#rail { position: absolute; left: 0; top: 0; width: 380px; height: 1080px; background: #12161b; z-index: 3;
+        transform: translateX(-380px); transition: transform 0.15s ease-out; will-change: transform; }
+#home.railopen #rail { transform: translateX(0); box-shadow: 12px 0 40px rgba(0, 0, 0, 0.6); }
+#dim { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; background: #000; opacity: 0; z-index: 2;
+       transition: opacity 0.15s; pointer-events: none; }
+#home.railopen #dim { opacity: 0.55; }
+#brand { height: 120px; line-height: 120px; padding-left: 48px; font-size: 40px; font-weight: bold; color: #2aabee; }
+#rail-wrap { position: absolute; top: 120px; left: 0; width: 380px; height: 930px; overflow: hidden; }
+#rail-list { will-change: transform; }
+.src { height: 72px; line-height: 72px; padding: 0 28px 0 48px; font-size: 30px; white-space: nowrap; overflow: hidden;
+       text-overflow: ellipsis; color: #aeb4bb; border-left: 6px solid transparent; }
+.src .k { font-size: 22px; color: #6b737c; margin-right: 10px; }
+.src.cur { color: #fff; border-left-color: #2aabee; }
+.src.focus { background: #2aabee; color: #fff; }
+.src.focus .k { color: #dff3ff; }
+
+#main { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+/* 浏览页不要顶栏（用户 2026-10-01：不需要展示群名），群名只在左边来源栏里 */
+#head { display: none; }
+#src-hint { position: absolute; right: 60px; top: 46px; font-size: 24px; color: #5f6770; }
+#src-title { font-size: 44px; padding-top: 30px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#src-sub { font-size: 24px; color: #7d858e; margin-top: 6px; }
+#grid-wrap { position: absolute; top: 50px; left: 0; width: 1920px; height: 1030px; overflow: hidden; }
+#grid { position: relative; will-change: transform; }
+.card { position: absolute; width: 576px; height: 450px; }
+.thumb { position: relative; width: 576px; height: 324px; background: #1c2128; border-radius: 10px; overflow: hidden; }
+.thumb img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+/* 没缩略图的片子（不少大文件转发过来就没有）：片名当封面 */
+.ph { position: absolute; left: 0; top: 0; width: 100%; height: 100%; box-sizing: border-box; padding: 0 40px; display: flex;
+      align-items: center; justify-content: center; text-align: center; overflow: hidden; }
+.ph span { font-size: 42px; line-height: 1.3; font-weight: bold; color: rgba(255, 255, 255, 0.92); letter-spacing: 2px;
+           text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5); max-height: 165px; overflow: hidden; }
+/* 海报卡片：海报完整居中（2:3，卡片高 324 → 宽 216），两边是同一张海报缩小再拉伸的底图，压暗一点；底下的片名占位文字藏起来 */
+.thumb.hasposter .ph span { display: none; }
+.pbg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background-size: cover; background-position: center; opacity: 0.55; }
+.thumb img.pimg { left: 180px; width: 216px; height: 324px; object-fit: cover; box-shadow: 0 0 30px rgba(0, 0, 0, 0.6); }
+.dur { position: absolute; z-index: 1; right: 8px; bottom: 10px; background: rgba(0, 0, 0, 0.75); color: #fff; font-size: 20px;
+       padding: 2px 8px; border-radius: 4px; }
+.prog { position: absolute; z-index: 1; left: 0; bottom: 0; height: 6px; background: #2aabee; }
+.title { font-size: 30px; line-height: 40px; margin-top: 14px; max-height: 80px; overflow: hidden;
+         display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.meta { font-size: 24px; color: #7d858e; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card.focus .thumb { box-shadow: 0 0 0 5px #2aabee; }
+.card.focus .title { color: #fff; }
+#empty { position: absolute; top: 300px; left: 60px; width: 1700px; font-size: 34px; line-height: 1.7; color: #9aa1a9; }
+#empty b { color: #2aabee; }
+
+/* ---------- 播放器 ---------- */
+#player { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; background: #000; display: none; }
+#player.on { display: block; }
+video { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; background: #000; }
+#ov { position: absolute; left: 0; bottom: 0; width: 1920px; height: 260px; opacity: 0.99;
+      background: linear-gradient(to bottom, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.85)); display: none; }
+#ov.on { display: block; }
+#ov-title { position: absolute; left: 80px; top: 70px; width: 1760px; font-size: 38px; white-space: nowrap; overflow: hidden;
+            text-overflow: ellipsis; text-shadow: 0 0 6px #000; }
+#ov-bar { position: absolute; left: 80px; top: 145px; width: 1760px; height: 8px; background: rgba(255, 255, 255, 0.25); border-radius: 4px; }
+#ov-buf { position: absolute; left: 0; top: 0; height: 8px; background: rgba(255, 255, 255, 0.35); border-radius: 4px; }
+#ov-fill { position: absolute; left: 0; top: 0; height: 8px; background: #2aabee; border-radius: 4px; }
+#ov-dot { position: absolute; top: -8px; width: 24px; height: 24px; margin-left: -12px; background: #fff; border-radius: 12px; }
+#ov-row { position: absolute; left: 80px; top: 180px; width: 1760px; font-size: 28px; color: #d0d4d8; }
+#ov-keys { float: right; color: #8b939b; font-size: 24px; }
+#seekhint { position: absolute; left: 0; top: 440px; width: 1920px; text-align: center; font-size: 64px; font-weight: bold;
+            text-shadow: 0 0 12px #000; display: none; }
+#spin { position: absolute; left: 0; top: 460px; width: 1920px; text-align: center; display: none; }
+#spin.on { display: block; }
+#spin .ring { width: 72px; height: 72px; margin: 0 auto; border: 8px solid rgba(255, 255, 255, 0.2); border-top-color: #2aabee;
+              border-radius: 50%; animation: rot 0.9s linear infinite; }
+#spin-text { margin-top: 24px; font-size: 28px; color: #c5cad0; text-shadow: 0 0 6px #000; }
+@keyframes rot { to { transform: rotate(360deg); } }
+/* ---------- 字幕（subs.js） ---------- */
+/* 文字字幕：底部居中，白字黑边（text-shadow 一圈，不用滤镜）；进度条浮层出来时整体抬到它上面（#player.ovon） */
+#sub { position: absolute; left: 140px; width: 1640px; bottom: 64px; text-align: center; font-size: 54px; line-height: 1.32;
+       color: #fff; white-space: pre-line; pointer-events: none; font-weight: 600;
+       text-shadow: -3px -3px 0 #000, 3px -3px 0 #000, -3px 3px 0 #000, 3px 3px 0 #000, 0 3px 0 #000, 0 -3px 0 #000, 3px 0 0 #000, -3px 0 0 #000, 0 0 10px #000; }
+/* 要放在上面的（ASS 的 \an7–9、标牌字幕） */
+#subtop { position: absolute; left: 140px; width: 1640px; top: 56px; text-align: center; font-size: 46px; line-height: 1.32;
+          color: #fff; white-space: pre-line; pointer-events: none; font-weight: 600;
+          text-shadow: -3px -3px 0 #000, 3px -3px 0 #000, -3px 3px 0 #000, 3px 3px 0 #000, 0 3px 0 #000, 0 -3px 0 #000, 3px 0 0 #000, -3px 0 0 #000, 0 0 10px #000; }
+#player.ovon #sub { bottom: 280px; }
+#subpic { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; pointer-events: none; }
+
+#perr { position: absolute; left: 200px; top: 330px; width: 1520px; text-align: center; font-size: 36px; line-height: 1.6;
+        display: none; }
+#perr .report { justify-content: center; }
+
+/* 出错时的「到 GitHub 报」（app.js 的 reportHtml）：左边码，右边一段话 */
+.report { display: flex; align-items: center; text-align: left; margin-top: 40px; }
+.report .rq { flex: none; background: #fff; margin-right: 36px; }
+.report .rq svg { width: 100%; height: 100%; display: block; }
+.report .rt { font-size: 28px; line-height: 1.6; color: #8b939b; max-width: 900px; text-shadow: none; }
+.report .rt b { color: #2aabee; }
+
+/* ---------- 登录 ---------- */
+#panel { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; background: #101418; display: none; }
+#panel.on { display: block; }
+#qr { position: absolute; left: 1180px; top: 190px; width: 620px; height: 620px; background: #fff; }
+#qr svg { width: 100%; height: 100%; display: block; }
+#how { position: absolute; left: 120px; top: 260px; width: 960px; font-size: 40px; line-height: 1.6; }
+#how b { color: #2aabee; }
+#qrstate { color: #999; font-size: 30px; margin-top: 30px; }
+#pwbox { position: absolute; left: 120px; top: 640px; display: none; font-size: 34px; }
+#pwbox.on { display: block; }
+#pw { font-size: 40px; width: 700px; padding: 10px; margin-top: 16px; }
+
+#toast { position: absolute; left: 0; bottom: 70px; width: 1920px; text-align: center; display: none; }
+/* 播放时提示条放上面：底下是字幕的位置 */
+#player.on ~ #toast { bottom: auto; top: 60px; }
+#toast span { display: inline-block; background: rgba(30, 36, 44, 0.95); color: #fff; font-size: 30px; padding: 16px 36px; border-radius: 40px; }
+#lines { position: absolute; left: 40px; top: 20px; width: 1300px; font-size: 20px; line-height: 1.4; color: #ffd27a;
+         text-shadow: 0 0 4px #000; pointer-events: none; }
+
+/* ---------- 播放器里的菜单（长按确认键）---------- */
+#menu { position: absolute; right: 0; top: 0; width: 720px; height: 1080px; background: rgba(14, 17, 21, 0.95); display: none;
+        box-shadow: -12px 0 40px rgba(0, 0, 0, 0.6); }
+#menu.on { display: block; }
+#menu-wrap { position: absolute; left: 0; top: 0; width: 720px; height: 980px; overflow: hidden; }
+#menu-list { padding-top: 36px; will-change: transform; }
+#menu .mh { font-size: 26px; color: #7d858e; padding: 26px 48px 8px; }
+#menu .mi { font-size: 32px; height: 68px; line-height: 68px; padding: 0 40px 0 48px; white-space: nowrap; overflow: hidden;
+            text-overflow: ellipsis; color: #d0d4d8; }
+#menu .mi .ck { display: inline-block; width: 44px; color: #2aabee; }
+#menu .mi.dis { color: #5a626b; }
+#menu .mi.focus { background: #2aabee; color: #fff; }
+#menu .mi.focus .ck { color: #fff; }
+#menu-foot { position: absolute; left: 48px; bottom: 34px; font-size: 24px; color: #6b737c; }
+
+/* 放完了、有下一集：右下角倒计时 */
+#upnext { position: absolute; right: 80px; bottom: 110px; width: 760px; background: rgba(14, 17, 21, 0.94); border-radius: 14px;
+          padding: 30px 40px; display: none; box-shadow: 0 0 40px rgba(0, 0, 0, 0.6); }
+#upnext.on { display: block; }
+#upnext .h { font-size: 26px; color: #8b939b; }
+#upnext .t { font-size: 40px; margin-top: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#upnext .k { font-size: 26px; color: #8b939b; margin-top: 18px; }
+
+/* 搜索 */
+#sx { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; background: rgba(10, 13, 16, 0.96); display: none; }
+#sx.on { display: block; }
+#sx .box { position: absolute; left: 460px; top: 150px; width: 1000px; }
+#sx .h { font-size: 56px; margin-bottom: 24px; }
+#sx .sub { font-size: 28px; line-height: 1.6; color: #8b939b; margin-bottom: 36px; }
+#sx input { font-size: 44px; width: 960px; padding: 14px 18px; border: 3px solid #3a424b; border-radius: 10px; background: #1b2128; color: #fff; outline: none; }
+#sx input:focus { border-color: #2aabee; }
+#sx .lab { font-size: 26px; color: #7d858e; margin: 40px 0 12px; }
+#sx-recent .q { display: inline-block; font-size: 30px; padding: 10px 26px; margin: 0 16px 16px 0; border-radius: 30px; background: #1b2128; color: #c5cad0; }
+#sx-recent .q.focus { background: #2aabee; color: #fff; }
+
+/* 账号 */
+#acct { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; background: rgba(10, 13, 16, 0.96); display: none; }
+#acct.on { display: block; }
+#acct .box { position: absolute; left: 460px; top: 150px; width: 1000px; }
+#acct .h { font-size: 56px; margin-bottom: 24px; }
+#acct .sub { font-size: 28px; line-height: 1.6; color: #8b939b; margin-bottom: 36px; }
+#acct .ai { font-size: 36px; height: 84px; line-height: 84px; padding: 0 30px; border-radius: 10px; color: #d0d4d8;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#acct .ai .ck { display: inline-block; width: 54px; color: #2aabee; }
+#acct .ai.sep { margin-top: 24px; }
+#acct .ai.focus { background: #2aabee; color: #fff; }
+#acct .ai.focus .ck { color: #fff; }
+#qrnote { color: #f0b429; font-size: 30px; margin-top: 20px; }
+
+/* 设置：和账号页一个样子，下面两行状态 */
+#opts { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; background: rgba(10, 13, 16, 0.96); display: none; }
+#opts.on { display: block; }
+#opts .box { position: absolute; left: 240px; top: 150px; width: 1000px; }
+#opts-report { position: absolute; left: 1380px; top: 236px; width: 380px; }
+#opts-qr { width: 380px; height: 380px; background: #fff; }
+#opts-qr svg { width: 100%; height: 100%; display: block; }
+#opts-report .t { font-size: 26px; line-height: 1.6; color: #8b939b; margin-top: 24px; }
+#opts .h { font-size: 56px; margin-bottom: 36px; }
+#opts .ai { font-size: 36px; height: 84px; line-height: 84px; padding: 0 30px; border-radius: 10px; color: #d0d4d8; }
+#opts .ai.sep { margin-top: 24px; }
+#opts .ai.focus { background: #2aabee; color: #fff; }
+#opts .st { font-size: 28px; line-height: 1.5; color: #c5cad0; margin-top: 24px; min-height: 42px; }
+#opts .sub { font-size: 26px; line-height: 1.6; color: #8b939b; margin-top: 40px; }
+
+/* 第一次打开：填 API ID / Hash（apikey.js）。和网页登录一个样子，右边多一个去 my.telegram.org 的码 */
+#api { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; background: #101418; display: none; }
+#api.on { display: block; }
+#api .box { position: absolute; left: 120px; top: 120px; width: 1060px; }
+#api .h { font-size: 56px; margin-bottom: 24px; }
+#api .sub { font-size: 28px; line-height: 1.6; color: #8b939b; margin-bottom: 30px; }
+#api .lab { font-size: 30px; color: #c5cad0; margin: 24px 0 10px; }
+#api input { font-size: 40px; width: 1020px; padding: 14px 18px; border: 3px solid #3a424b; border-radius: 10px; background: #1b2128; color: #fff; outline: none; font-family: monospace; }
+#api input:focus { border-color: #2aabee; }
+#api-msg { font-size: 30px; color: #f0b429; margin-top: 30px; min-height: 40px; line-height: 1.5; }
+#api-qr { position: absolute; left: 1320px; top: 240px; width: 480px; height: 480px; background: #fff; }
+#api-qr svg { width: 100%; height: 100%; display: block; }
+#api-url { position: absolute; left: 1320px; top: 750px; width: 480px; text-align: center; font-size: 32px; color: #2aabee; }
+
+/* 网页登录 */
+#wl { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; background: rgba(10, 13, 16, 0.94); display: none; }
+#wl.on { display: block; }
+#wl .box { position: absolute; left: 460px; top: 170px; width: 1000px; }
+#wl .h { font-size: 56px; margin-bottom: 24px; }
+#wl .sub { font-size: 28px; line-height: 1.6; color: #8b939b; margin-bottom: 40px; }
+#wl .lab { font-size: 30px; color: #c5cad0; margin: 24px 0 10px; }
+#wl input { font-size: 40px; width: 960px; padding: 14px 18px; border: 3px solid #3a424b; border-radius: 10px; background: #1b2128; color: #fff; outline: none; }
+#wl input:focus { border-color: #2aabee; }
+#wl-msg { font-size: 30px; color: #f0b429; margin-top: 30px; min-height: 40px; }
+
+/* 音乐（music.js）：左边方形封面，右边歌名、歌手、来自哪个群、状态、下一首；底下进度条。背景是封面缩成小图再拉伸（不用 CSS 滤镜：
+ * 抖音项目实测滤镜在电视上很贵），压暗 */
+#music { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; background: #0e1115; display: none; overflow: hidden; }
+#music.on { display: block; }
+#mu-bg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background-size: cover; background-position: center; opacity: 0.35; }
+#mu-art { position: absolute; left: 160px; top: 170px; width: 560px; height: 560px; border-radius: 16px; overflow: hidden; background: #1c2128;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6); }
+#mu-art .ph span { font-size: 48px; max-height: 320px; }
+#mu-img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; display: none; }
+#mu-img.on { display: block; }
+#mu-meta { position: absolute; left: 820px; top: 230px; width: 960px; }
+#mu-title { font-size: 60px; line-height: 76px; font-weight: bold; max-height: 228px; overflow: hidden;
+            display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+#mu-artist { font-size: 40px; color: #c5cad0; margin-top: 24px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#mu-from { font-size: 28px; color: #8b939b; margin-top: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#mu-state { font-size: 30px; color: #2aabee; margin-top: 40px; min-height: 40px; }
+#mu-state.err { color: #f0b429; }
+#mu-next { font-size: 28px; color: #8b939b; margin-top: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#mu-bar { position: absolute; left: 160px; top: 860px; width: 1600px; height: 8px; background: rgba(255, 255, 255, 0.25); border-radius: 4px; }
+#mu-fill { position: absolute; left: 0; top: 0; height: 8px; background: #2aabee; border-radius: 4px; }
+#mu-dot { position: absolute; top: -8px; width: 24px; height: 24px; margin-left: -12px; background: #fff; border-radius: 12px; }
+#mu-row { position: absolute; left: 160px; top: 900px; width: 1600px; font-size: 28px; color: #d0d4d8; }
+#mu-keys { float: right; color: #8b939b; font-size: 24px; }
+#music.on ~ #toast { bottom: auto; top: 60px; }
+/* 卡片上的专辑封面：方的，居中（卡片高 324），两边同一张图缩小拉伸铺底，同海报 */
+.thumb img.aimg { left: 126px; width: 324px; height: 324px; object-fit: cover; box-shadow: 0 0 30px rgba(0, 0, 0, 0.6); }
+.card .now { position: absolute; z-index: 1; left: 8px; top: 10px; background: #2aabee; color: #fff; font-size: 22px; padding: 4px 12px; border-radius: 6px; }
+
+/* ---------- 极简电视列表：只显示选定群组 / 频道里的 Telegram 视频 ---------- */
+#rail, #dim { display: none !important; }
+#main { left: 0; width: 1920px; }
+#head { display: block; position: absolute; left: 80px; right: 80px; top: 0; height: 120px; box-sizing: border-box; }
+#src-title { font-size: 42px; line-height: 1.25; padding-top: 34px; max-width: 1760px; }
+#src-sub, #src-hint { display: none !important; }
+#grid-wrap { position: absolute; top: 130px; left: 0; width: 1920px; height: 940px; overflow-x: hidden; overflow-y: auto; padding: 0 80px 24px; box-sizing: border-box; }
+#grid { position: relative; width: 100%; height: auto !important; transform: none !important; will-change: auto; }
+#grid-wrap::-webkit-scrollbar, #picker-list::-webkit-scrollbar { width: 0; height: 0; }
+.video-row { display: flex; align-items: center; width: 100%; min-height: 112px; box-sizing: border-box; padding: 24px 34px; margin: 0 0 12px;
+             background: #151a20; border: 2px solid transparent; border-radius: 12px; color: #e8eaed; }
+.video-row .video-play { flex: none; width: 48px; font-size: 26px; color: #73808e; }
+.video-row .video-name { flex: 1; min-width: 0; white-space: normal; word-wrap: break-word; word-break: break-word; font-size: 36px; line-height: 1.35; }
+.video-row.focus { background: #1b2b3b; border-color: #2aabee; }
+.video-row.focus .video-play { color: #2aabee; }
+#empty { top: 450px; left: 120px; width: 1680px; text-align: center; }
+
+/* ---------- 选择单一来源 ---------- */
+#picker, #post-url { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; display: none; background: rgba(8, 11, 15, 0.98); z-index: 30; }
+#picker.on, #post-url.on { display: block; }
+.picker-box { position: absolute; left: 190px; top: 88px; width: 1540px; height: 900px; }
+.picker-heading, .post-heading { font-size: 54px; font-weight: bold; margin: 0 0 28px; }
+#picker-list { height: 760px; overflow-y: auto; overflow-x: hidden; }
+.picker-row { display: flex; align-items: center; min-height: 78px; box-sizing: border-box; padding: 12px 26px; border-radius: 10px; color: #d0d6dd; }
+.picker-kind { flex: none; width: 150px; color: #8493a2; font-size: 26px; }
+.picker-name { flex: 1; min-width: 0; font-size: 34px; line-height: 1.3; word-wrap: break-word; }
+.picker-row.focus { background: #1b2b3b; color: #fff; outline: 2px solid #2aabee; }
+#picker-msg, .picker-foot { font-size: 26px; line-height: 1.5; color: #84909d; margin-top: 18px; }
+.picker-foot { margin-top: 10px; }
+
+/* ---------- 公开帖子 URL 输入 ---------- */
+.post-box { position: absolute; left: 240px; top: 190px; width: 1440px; }
+.post-description { font-size: 30px; line-height: 1.5; color: #9aa5b1; margin: 24px 0 28px; }
+#post-input { width: 1380px; box-sizing: border-box; font-size: 34px; padding: 24px 26px; border: 3px solid #394553; border-radius: 12px; background: #171e26; color: #fff; outline: none; }
+#post-input:focus { border-color: #2aabee; }
+#post-msg { min-height: 54px; font-size: 27px; line-height: 1.5; color: #e0b96f; margin-top: 24px; word-wrap: break-word; }
+.post-foot { font-size: 25px; color: #7d8996; margin-top: 22px; }

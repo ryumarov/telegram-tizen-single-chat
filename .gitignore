@@ -1,0 +1,12 @@
+build/node_modules/
+app/js/tg.bundle.js
+app/js/tg.legacy.js
+*.wgt
+logs/
+.buildResult/
+test/media/
+build/out/
+app/.manifest.tmp
+app/*signature*.xml
+app/js/sites.local.js
+NOTES.local.md
