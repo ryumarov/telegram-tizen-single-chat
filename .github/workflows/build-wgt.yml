@@ -1,0 +1,47 @@
+
+name: Build Telegram Tizen WGT
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: build/package-lock.json
+
+      - name: Install build dependencies
+        run: npm ci --prefix build
+
+      - name: Verify source syntax
+        run: node tools/syntax-verify.mjs
+
+      - name: Run single chat tests
+        run: node test/single-chat.mjs
+
+      - name: Build JavaScript bundle
+        run: bash build/bundle.sh
+
+      - name: Upload build output
+        uses: actions/upload-artifact@v4
+        with:
+          name: telegram-tizen-build
+          path: |
+            app/
+            build/
+          if-no-files-found: error
