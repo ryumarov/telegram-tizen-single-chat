@@ -22,11 +22,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-          cache-dependency-path: build/package-lock.json
 
       - name: Install build dependencies
         run: npm ci --prefix build
+
+      - name: Build JavaScript bundle
+        run: bash build/bundle.sh
 
       - name: Verify source syntax
         run: node tools/syntax-verify.mjs
@@ -34,14 +35,11 @@ jobs:
       - name: Run single chat tests
         run: node test/single-chat.mjs
 
-      - name: Build JavaScript bundle
-        run: bash build/bundle.sh
-
       - name: Upload build output
         uses: actions/upload-artifact@v4
         with:
           name: telegram-tizen-build
           path: |
             app/
-            build/
+            build/out/
           if-no-files-found: error
